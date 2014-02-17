@@ -1,7 +1,7 @@
-extern mod extra;
-extern mod oblw;
+extern crate collections;
+extern crate oblw;
 
-use extra::bitv;
+use collections::bitv;
 
 use std::os;
 use std::num;

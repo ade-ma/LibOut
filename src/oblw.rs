@@ -1,9 +1,9 @@
-extern mod usb;
-extern mod libusb;
-extern mod extra;
+extern crate usb;
+extern crate libusb;
+extern crate collections;
 
 use std::comm;
-use extra::bitv;
+use collections::bitv;
 
 use std::comm::{Data, Empty, Disconnected};
 
@@ -81,7 +81,7 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Chan<~[u8]>, std::comm
 	};
 
 	let (pDataO, cDataO): (comm::Port<~[u8]>, comm::Chan<~[u8]>) = comm::Chan::new();
-	do spawn {
+	spawn(proc() {
 		// 0x02 = 
 		ho.write_stream(0x02, libusb::LIBUSB_TRANSFER_TYPE_BULK, 64, 8, |buf| {
 			let y = buf.unwrap();
@@ -98,17 +98,17 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Chan<~[u8]>, std::comm
 					return false;
 				},
 			}
-		}); }
+		}); });
 
 	let (pDataI, cDataI): (comm::Port<~[u8]>, comm::Chan<~[u8]>) = comm::Chan::new();
 	let hi = handle.clone();
-	do spawn {
+	spawn(proc() {
 		hi.read_stream(0x81, libusb::LIBUSB_TRANSFER_TYPE_BULK, 64, 8, |res| {
 			let y: ~[u8] = res.unwrap().to_owned();
 			if cDataI.try_send(y) { true }
 			else { false }
-		});
-	}
+		})
+	});
 	return (cDataO, pDataI)
 }
 
