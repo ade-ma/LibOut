@@ -3,6 +3,10 @@ extern crate oblw;
 
 use collections::bitv;
 
+use std::io::net::ip::{SocketAddr, Ipv4Addr};
+use std::io::net::udp::UdpSocket;
+use std::io::{Listener, Acceptor};
+
 use std::os;
 use std::num;
 use std::libc;
@@ -47,6 +51,16 @@ fn main() {
 	if ((args.len() - 1) > 0) {
 		let n: uint = num::strconv::from_str_common(args[1].slice_from(0), 10, false, false, false, num::strconv::ExpNone, false, false).unwrap();
 		for _ in range(0, 7) {c = oblw::sendBitstream(outlet(n), c); }
+	}
+	else {
+		let mut inn = ~[0u8, ..512];
+		let mut sock = UdpSocket::bind(SocketAddr{ip:Ipv4Addr(127,0,0,1), port:9997}).unwrap();
+		'rpc: loop {
+			let (ct, org) = sock.recvfrom(inn.mut_slice_from(0)).unwrap();
+			println!("{:?}", org);
+			let cmd = io::extensions::u64_from_be_bytes(inn.slice_from(0), 0, ct) as uint;
+			for _ in range(0, 7) {c = oblw::sendBitstream(outlet(cmd), c); }
+		}
 	}
 	timer.sleep(100);
 	unsafe {libc::funcs::c95::stdlib::exit(1);}
