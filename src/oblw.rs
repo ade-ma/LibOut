@@ -7,7 +7,7 @@ use collections::bitv;
 
 use std::comm::{Data, Empty, Disconnected};
 
-#[deriving(Clone, DeepClone)]
+#[deriving(Clone)]
 pub struct Run {
 	v: uint,
 	ct: uint
