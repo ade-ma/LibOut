@@ -2,6 +2,7 @@
 #[desc = "A TOML configuration file parser for Rust"];
 #[license = "MIT"];
 #[crate_type = "lib"];
+#[feature(phase)];
 
 /// A TOML [1] configuration file parser
 ///
@@ -11,12 +12,13 @@
 
 extern crate serialize;
 extern crate collections;
+#[phase(syntax, link)] extern crate log;
 
 use std::char;
 use std::mem;
 
 use collections::hashmap::{HashMap,MoveEntries};
-use std::vec::MoveItems;
+use std::slice::MoveItems;
 
 use std::io::{File,IoError,IoResult,EndOfFile};
 use std::io::{Buffer,BufReader,BufferedReader};

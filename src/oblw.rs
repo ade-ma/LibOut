@@ -60,7 +60,7 @@ fn assemblePacket(y: &mut [u8], x: &[u8], norm: bool) {
 	}
 }
 
-pub fn spawnBytestream(defaultState: bool) -> (std::comm::Chan<~[u8]>, std::comm::Port<~[u8]>)  {
+pub fn spawnBytestream(defaultState: bool) -> (std::comm::Sender<~[u8]>, std::comm::Receiver<~[u8]>)  {
 	let c = usb::Context::new();
 	c.setDebug(2);
 	let dev = match c.find_by_vid_pid(0x59e3, 0xf000) {
@@ -80,7 +80,7 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Chan<~[u8]>, std::comm
 		true => handle.ctrl_read(0x40|0x80, 0x08, 0x00, 0x0653, 0).unwrap(),
 	};
 
-	let (pDataO, cDataO): (comm::Port<~[u8]>, comm::Chan<~[u8]>) = comm::Chan::new();
+	let (cDataO, pDataO) = comm::channel::<~[u8]>();
 	spawn(proc() {
 		// 0x02 = 
 		ho.write_stream(0x02, libusb::LIBUSB_TRANSFER_TYPE_BULK, 64, 8, |buf| {
@@ -100,7 +100,7 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Chan<~[u8]>, std::comm
 			}
 		}); });
 
-	let (pDataI, cDataI): (comm::Port<~[u8]>, comm::Chan<~[u8]>) = comm::Chan::new();
+	let (cDataI, pDataI) = comm::channel();
 	let hi = handle.clone();
 	spawn(proc() {
 		hi.read_stream(0x81, libusb::LIBUSB_TRANSFER_TYPE_BULK, 64, 8, |res| {
@@ -112,7 +112,7 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Chan<~[u8]>, std::comm
 	return (cDataO, pDataI)
 }
 
-pub fn sendBitstream(syn: bitv::Bitv, c: comm::Chan<~[u8]>) -> comm::Chan<~[u8]>{
+pub fn sendBitstream(syn: bitv::Bitv, c: comm::Sender<~[u8]>) -> comm::Sender<~[u8]>{
 	let bytes: ~[u8] = b2B(syn);
 	for packet in bytes.chunks(64) {
 		let mut packet: ~[u8] = packet.iter().map(|&x| x).collect();

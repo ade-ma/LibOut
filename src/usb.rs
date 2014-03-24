@@ -6,9 +6,9 @@ extern crate libusb;
 use libusb::*;
 use std::intrinsics;
 use std::libc::{c_int, c_void, size_t, malloc, free};
-use std::vec;
+use std::slice;
 use std::result::Result;
-use std::comm::{Port, Chan};
+use std::comm::{Receiver, Sender};
 use std::cast::transmute;
 use std::mem::size_of;
 
@@ -67,7 +67,7 @@ impl Context {
 		unsafe{
 			let mut list: *mut *mut libusb_device = intrinsics::init();
 			let num_devices = libusb_get_device_list(self.ptr(), &mut list);
-			let r = vec::raw::mut_buf_as_slice(list, num_devices as uint, |l|{
+			let r = slice::raw::mut_buf_as_slice(list, num_devices as uint, |l|{
 				l.iter().map(|i| Device{dev: *i, ctx: (*self).clone()}).collect()
 			});
 
@@ -113,14 +113,14 @@ impl Context {
 
 extern fn rust_usb_callback(transfer: *mut libusb_transfer) {
 	unsafe {
-		let chan: ~Chan<()> = transmute((*transfer).user_data);
+		let chan: ~Sender<()> = transmute((*transfer).user_data);
 		chan.send(());
 	}
 }
 
 struct TH {
 	t: *mut libusb_transfer,
-	c: Chan<*mut libusb_transfer>,
+	c: Sender<*mut libusb_transfer>,
 }
 
 impl Drop for TH{
@@ -134,7 +134,7 @@ impl Drop for TH{
 
 extern fn rust_usb_stream_callback(transfer: *mut libusb_transfer) {
 	unsafe {
-		let chan: &Chan<*mut libusb_transfer> = transmute((*transfer).user_data);
+		let chan: &Sender<*mut libusb_transfer> = transmute((*transfer).user_data);
 		chan.send(transfer);
 	}
 }
@@ -247,7 +247,7 @@ impl DeviceHandle {
 		length: uint,
 		buffer: *mut u8) -> (libusb_transfer_status, uint) {
 
-		let (port, chan): (Port<()>, Chan<()>) = Chan::new();
+		let (chan, port) : (Sender<()>, Receiver<()>) = channel();
 
 		let t = libusb_alloc_transfer(0);
 		(*t).dev_handle = self.ptr();
@@ -271,7 +271,7 @@ impl DeviceHandle {
 			transfer_type: libusb_transfer_type,
 			size: uint
 			) -> Result<~[u8], libusb_transfer_status> {
-		let mut buf: ~[u8] = vec::from_elem(size, 0u8);
+		let mut buf: ~[u8] = slice::from_elem(size, 0u8);
 		unsafe {
 			let ptr = buf.as_mut_ptr();
 			let (status, actual_length) = self.submit_transfer_sync(
@@ -306,7 +306,7 @@ impl DeviceHandle {
 
 		let setup_length = size_of::<libusb_control_setup>();
 		let total_length = setup_length + length as uint;
-		let mut buf: ~[u8] = vec::from_elem(total_length, 0u8);
+		let mut buf: ~[u8] = slice::from_elem(total_length, 0u8);
 
 		unsafe{
 			let ptr = fill_setup_buf(buf, bmRequestType, bRequest, wValue, wIndex, length);
@@ -325,7 +325,7 @@ impl DeviceHandle {
 	pub fn ctrl_write(&self, bmRequestType: u8, bRequest: u8,
 		wValue:u16, wIndex: u16, buf: &[u8]) -> Result<(), libusb_transfer_status> {
 		unsafe {
-			let mut setup_buf = vec::from_elem(size_of::<libusb_control_setup>(), 0u8);
+			let mut setup_buf = slice::from_elem(size_of::<libusb_control_setup>(), 0u8);
 			fill_setup_buf(setup_buf, bmRequestType, bRequest, wValue, wIndex, buf.len());
 			self.write(0, LIBUSB_TRANSFER_TYPE_CONTROL, setup_buf+buf)
 		}
@@ -333,11 +333,11 @@ impl DeviceHandle {
 
 	unsafe fn stream_transfers(&self, endpoint: u8,
 			transfer_type: libusb_transfer_type, size: uint,
-			num_transfers: uint) -> (Port<*mut libusb_transfer>, ~[TH]) {
+			num_transfers: uint) -> (Receiver<*mut libusb_transfer>, ~[TH]) {
 		
-		let (port, chan) = Chan::new();
+		let (chan, port) = channel();
 
-		let transfers = vec::from_fn(num_transfers, |_| { TH {
+		let transfers = slice::from_fn(num_transfers, |_| { TH {
 			t: libusb_alloc_transfer(0),
 			c: chan.clone(),
 		}});
@@ -373,7 +373,7 @@ impl DeviceHandle {
 				let transfer: *mut libusb_transfer = port.recv();
 
 				if ((*transfer).get_status() == LIBUSB_TRANSFER_COMPLETED) {
-					vec::raw::buf_as_slice((*transfer).buffer as *u8, size, |b| {
+					slice::raw::buf_as_slice((*transfer).buffer as *u8, size, |b| {
 						running &= cb(Ok(b))
 					});
 				} else {
@@ -402,7 +402,7 @@ impl DeviceHandle {
 				endpoint, transfer_type, size, num_transfers);
 
 			for th in transfers.iter() {
-				vec::raw::mut_buf_as_slice((*th.t).buffer, size, |b| {
+				slice::raw::mut_buf_as_slice((*th.t).buffer, size, |b| {
 					running &= cb(Ok(b));
 				});
 				if running {
@@ -417,7 +417,7 @@ impl DeviceHandle {
 				let transfer: *mut libusb_transfer = port.recv();
 
 				if ((*transfer).get_status() == LIBUSB_TRANSFER_COMPLETED) {
-					vec::raw::mut_buf_as_slice((*transfer).buffer, size, |b| {
+					slice::raw::mut_buf_as_slice((*transfer).buffer, size, |b| {
 						running &= cb(Ok(b))
 					});
 				} else {
