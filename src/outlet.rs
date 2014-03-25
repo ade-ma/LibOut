@@ -15,11 +15,9 @@ use std::num;
 use std::libc;
 use std::io;
 
-
 fn main() {
 	let args = os::args();
 	let mut timer = io::Timer::new().unwrap();
-	let (mut c, p) = oblw::spawnBytestream(false);
 	let root = toml::parse_from_file("outlets.toml").unwrap();
 
 	let getCode = |x: &str| -> bitv::Bitv {
@@ -45,7 +43,9 @@ fn main() {
 
 	if (args.len() - 1) > 0 {
 		let syn = getCode(args[1].slice_from(0));
-		for _ in range(0, 7) {c = oblw::sendBitstream(syn.clone(), c); }
+		let (c, p) = oblw::spawnBytestream(false);
+		for _ in range(0, 7) {oblw::sendBitstream(syn.clone(), c.clone()); }
+		timer.sleep(1000);
 	}
 
 	else {
@@ -55,9 +55,11 @@ fn main() {
 			let (ct, org) = sock.recvfrom(inn.mut_slice_from(0)).unwrap();
 			let nu8 = inn.slice_to(inn.iter().position(|&x| x == 0u8).unwrap());
 			let name = str::from_utf8(nu8).unwrap();
-			for _ in range(0, 7) {c = oblw::sendBitstream(getCode(name), c); }
+			let syn = getCode(name);
+			let (c, p) = oblw::spawnBytestream(false);
+			for _ in range(0, 7) {oblw::sendBitstream(syn.clone(), c.clone()); }
+			timer.sleep(1000);
 		}
 	}
-	timer.sleep(100);
 	unsafe {libc::funcs::c95::stdlib::exit(1);}
 }

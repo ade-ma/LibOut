@@ -1,9 +1,10 @@
 CC=rustc
+CFLAGS=-O -L ./lib -A unused-variable -A unused-imports
 
 ifeq ($(ARCH),arm)
-CFLAGS=-O -L ./lib -A unused-variable -A unused-imports --target arm-unknown-linux-gnueabihf -C linker=arm-linux-gnueabihf-gcc -C link-args=-Wl,-rpath-link,$(PWD)/lib
+CFLAGS+=--target arm-unknown-linux-gnueabihf -C linker=arm-linux-gnueabihf-gcc -C link-args=-Wl,-rpath-link,$(PWD)/lib/
 else
-CFLAGS=-O -L ./lib -A unused-variable -A unused-imports
+CFLAGS+=
 endif
 
 OBJ = ./lib/liblibusb*.rlib ./lib/libusb*.rlib ./lib/liboblw*.rlib ./lib/libtoml*.rlib
