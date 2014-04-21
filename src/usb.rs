@@ -1,11 +1,11 @@
 #[feature(globs)];
-
+extern crate libc;
 extern crate native;
 extern crate libusb;
 
 use libusb::*;
+use libc::{c_int, c_void, size_t, malloc, free};
 use std::intrinsics;
-use std::libc::{c_int, c_void, size_t, malloc, free};
 use std::slice;
 use std::result::Result;
 use std::comm::{Receiver, Sender};

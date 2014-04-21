@@ -4,14 +4,13 @@ extern crate collections;
 extern crate native;
 
 use std::comm;
+use std::vec;
 use collections::bitv;
-
-use std::comm::{Data, Empty, Disconnected};
 
 #[deriving(Clone)]
 pub struct Run {
-	v: uint,
-	ct: uint
+	pub v: uint,
+	pub ct: uint
 }
 
 pub fn rle<T: Ord+Clone+Primitive+ToPrimitive>(In: ~[T]) -> ~[Run] {
@@ -37,7 +36,7 @@ pub fn rld(In: ~[Run]) -> ~[uint] {
 	return Out
 }
 
-pub fn B2b(bytes: ~[u8]) -> bitv::Bitv {
+pub fn B2b(bytes: &[u8]) -> bitv::Bitv {
 	return bitv::from_bytes(bytes)
 }
 
@@ -46,7 +45,7 @@ pub fn v2b(uints: &[uint]) -> bitv::Bitv {
 	return bitv::from_bools(y.slice_from(0))
 }
 
-pub fn b2B(bits: bitv::Bitv) -> ~[u8] {
+pub fn b2B(bits: bitv::Bitv) -> vec::Vec<u8> {
 	return bits.to_bytes()
 }
 
@@ -87,16 +86,14 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Sender<~[u8]>, std::co
 		ho.write_stream(0x02, libusb::LIBUSB_TRANSFER_TYPE_BULK, 64, 8, |buf| {
 			let y = buf.unwrap();
 			match pDataO.try_recv() {
-				Data(d) => {assemblePacket(y, d, defaultState); return true;},
-				Empty => {
+				Ok(d) => {assemblePacket(y, d, defaultState); return true;},
+				Err(code) => {
+					println!("write_stream err: {:?}", code);
 					match defaultState {
 						true => assemblePacket(y, [0xffu8, ..64], defaultState),
 						false => assemblePacket(y, [0x00u8, ..64], defaultState)
 					};
 					return true;
-				},
-				Disconnected => {
-					return false;
 				},
 			}
 		}); });
@@ -106,16 +103,15 @@ pub fn spawnBytestream(defaultState: bool) -> (std::comm::Sender<~[u8]>, std::co
 	native::task::spawn(proc() {
 		hi.read_stream(0x81, libusb::LIBUSB_TRANSFER_TYPE_BULK, 64, 8, |res| {
 			let y: ~[u8] = res.unwrap().iter().map(|&x|x).collect();
-			if cDataI.try_send(y) { true }
-			else { false }
+			cDataI.send_opt(y).is_ok()
 		})
 	});
 	return (cDataO, pDataI)
 }
 
 pub fn sendBitstream(syn: bitv::Bitv, c: comm::Sender<~[u8]>) {
-	let bytes: ~[u8] = b2B(syn);
-	for packet in bytes.chunks(64) {
+	let bytes = b2B(syn);
+	for packet in bytes.slice_from(0).chunks(64) {
 		let mut packet: ~[u8] = packet.iter().map(|&x| x).collect();
 		let len = packet.len();
 		packet.grow(64-len, &0x00);
