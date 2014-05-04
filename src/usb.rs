@@ -11,6 +11,7 @@ use std::result::Result;
 use std::comm::{Receiver, Sender};
 use std::cast::transmute;
 use std::mem::size_of;
+use std::vec::Vec;
 
 use std::sync::arc::UnsafeArc;
 use std::sync::atomics::{AtomicInt, SeqCst};
@@ -270,8 +271,8 @@ impl DeviceHandle {
 			endpoint: u8,
 			transfer_type: libusb_transfer_type,
 			size: uint
-			) -> Result<~[u8], libusb_transfer_status> {
-		let mut buf: ~[u8] = slice::from_elem(size, 0u8);
+			) -> Result<Vec<u8>, libusb_transfer_status> {
+		let mut buf: Vec<u8> = Vec::from_elem(size, 0u8);
 		unsafe {
 			let ptr = buf.as_mut_ptr();
 			let (status, actual_length) = self.submit_transfer_sync(
@@ -306,10 +307,10 @@ impl DeviceHandle {
 
 		let setup_length = size_of::<libusb_control_setup>();
 		let total_length = setup_length + length as uint;
-		let mut buf: ~[u8] = slice::from_elem(total_length, 0u8);
+		let mut buf: Vec<u8> = Vec::from_elem(total_length, 0u8);
 
 		unsafe{
-			let ptr = fill_setup_buf(buf, bmRequestType, bRequest, wValue, wIndex, length);
+			let ptr = fill_setup_buf(buf.as_mut_slice(), bmRequestType, bRequest, wValue, wIndex, length);
 
 			let (status, actual_length) = self.submit_transfer_sync(
 				0, LIBUSB_TRANSFER_TYPE_CONTROL, total_length, ptr);
@@ -325,19 +326,20 @@ impl DeviceHandle {
 	pub fn ctrl_write(&self, bmRequestType: u8, bRequest: u8,
 		wValue:u16, wIndex: u16, buf: &[u8]) -> Result<(), libusb_transfer_status> {
 		unsafe {
-			let mut setup_buf = slice::from_elem(size_of::<libusb_control_setup>(), 0u8);
-			fill_setup_buf(setup_buf, bmRequestType, bRequest, wValue, wIndex, buf.len());
-			self.write(0, LIBUSB_TRANSFER_TYPE_CONTROL, setup_buf+buf)
+			let mut setup_buf = Vec::from_elem(size_of::<libusb_control_setup>(), 0u8);
+			fill_setup_buf(setup_buf.as_mut_slice(), bmRequestType, bRequest, wValue, wIndex, buf.len());
+			setup_buf.push_all(buf);
+			self.write(0, LIBUSB_TRANSFER_TYPE_CONTROL, setup_buf.slice_from(0))
 		}
 	}
 
 	unsafe fn stream_transfers(&self, endpoint: u8,
 			transfer_type: libusb_transfer_type, size: uint,
-			num_transfers: uint) -> (Receiver<*mut libusb_transfer>, ~[TH]) {
+			num_transfers: uint) -> (Receiver<*mut libusb_transfer>, Vec<TH>) {
 		
 		let (chan, port) = channel();
 
-		let transfers = slice::from_fn(num_transfers, |_| { TH {
+		let transfers = Vec::from_fn(num_transfers, |_| { TH {
 			t: libusb_alloc_transfer(0),
 			c: chan.clone(),
 		}});

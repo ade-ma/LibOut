@@ -28,19 +28,19 @@ fn main() {
 		match data {
 			Some(data) => {
 				let data = data.get_vec().unwrap();
-				let mut y: ~[oblw::Run] = ~[];
+				let mut y = vec!();
 				for _ in range(0, 5) {
 					data.iter().map(|bit| {
 						match bit {
-							&toml::PosInt(1) => y.push_all_move( ~[oblw::Run { v: 1, ct: 3}, oblw::Run { v: 0, ct: 1}]) ,
-							&toml::PosInt(0) => y.push_all_move( ~[oblw::Run { v: 1, ct: 1}, oblw::Run {v: 0, ct: 3}]) ,
+							&toml::PosInt(1) => y.push_all_move( vec!(oblw::Run { v: 1, ct: 561}, oblw::Run { v: 0, ct: 187})) ,
+							&toml::PosInt(0) => y.push_all_move( vec!(oblw::Run { v: 1, ct: 187}, oblw::Run {v: 0, ct: 561})) ,
 							x => println!("wat. got {:?}, expected 1/0",x)
 						}}).last();
-					y.push(oblw::Run {v: 0, ct: 25});
+					y.push(oblw::Run {v: 0, ct: 5000});
 				}
 				oblw::v2b(oblw::rld(y))
 			},
-			None => { oblw::v2b([]) }
+			None => { oblw::v2b(vec!()) }
 		}
 	};
 
